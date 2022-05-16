@@ -14,6 +14,7 @@ import matplotlib.pyplot as plt
 from itertools import count
 import pandas as pd
 from matplotlib.animation import FuncAnimation
+from PyQt5 import QtWidgets
 
 import time
 import os
@@ -28,6 +29,48 @@ mcp = Adafruit_MCP3008.MCP3008(spi=SPI.SpiDev(SPI_PORT, SPI_DEVICE))
 GPIO.setmode(GPIO.BOARD)
 GPIO.setup(12, GPIO.OUT)
 GPIO.output(12, GPIO.LOW)
+
+noiseCeiling = 0
+noiseFloor = 0
+
+class CalibrateWindow(QWidget):
+    def __init__(self, *args, **kwargs):
+        QWidget.__init__(self, *args, **kwargs)
+
+        self.loadingBar = QtWidgets.QProgressBar()
+        self.textInfoLabel = QtWidgets.QLabel()
+        self.textInfoLabel.setText("Turn laser off to begin calibration...")
+        self.textInfoLabel.setAlignment(Qt.AlignCenter)
+        run_btn=QtWidgets.QPushButton("Calibrate")
+
+        self.layout = QtWidgets.QVBoxLayout()
+        self.layout.addWidget(self.loadingBar)
+        self.layout.addWidget(self.textInfoLabel)
+        self.layout.addWidget(run_btn)
+
+        self.counter=0
+        self.calArray = np.zeros(1000)
+
+        run_btn.clicked.connect(self.button)
+
+        self.setLayout(self.layout)
+        self.show()
+
+    def button(self):
+        global noiseCeiling, noiseFloor
+        if self.counter==0:
+            for x in range(len(self.calArray)):
+                self.calArray[x] = mcp.read_adc(0)
+                self.loadingBar.setValue(int(50*x/len(self.calArray)))
+            noiseFloor = np.mean(self.calArray) + 2*np.std(self.calArray)
+            self.textInfoLabel.setText("Turn laser on")
+        elif self.counter==1:
+            for x in range(len(self.calArray)):
+                self.calArray[x] = mcp.read_adc(0)
+                self.loadingBar.setValue(int(50+50*x/len(self.calArray)))
+            noiseCeiling = np.mean(self.calArray) - 2*np.std(self.calArray)
+            self.close()
+        self.counter+=1
 
 
 class MatplotlibWidget(QMainWindow):
@@ -45,12 +88,11 @@ class MatplotlibWidget(QMainWindow):
         self.update_timer = QTimer()
         self.update_timer.setInterval(int(1000)) 
         self.update_timer.timeout.connect(self.update_TimerLabel)
-        self.update_timer.start()
 
         self.update_Hist = QTimer()
         self.update_Hist.setInterval(int(600)) 
         self.update_Hist.timeout.connect(self.update_display1)
-        self.update_Hist.start()
+        
 
         self.fanUpButton.clicked.connect(self.fanUp)
         self.fanDownButton.clicked.connect(self.fanDown)
@@ -61,7 +103,6 @@ class MatplotlibWidget(QMainWindow):
         self.readADC = QTimer()
         self.readADC.setInterval(int(15)) 
         self.readADC.timeout.connect(self.worker.start)
-        self.readADC.start()
         self.worker.update_SmallCount.connect(self.evt_UpdateSmallCount)
         self.worker.update_MediumCount.connect(self.evt_UpdateMediumCount)
         self.worker.update_LargeCount.connect(self.evt_UpdateLargeCount)
@@ -80,6 +121,14 @@ class MatplotlibWidget(QMainWindow):
         self.partCounter[2] += 1
 
     def startPause(self):
+        counter = 0
+        if counter == 0:
+            self._new_window = CalibrateWindow()
+            self._new_window.show()
+            self.readADC.start()
+            self.update_timer.start()
+            self.update_Hist.start()
+            counter+=1
         if self.update_timer.isActive():
             self.switchDisplayButton.setText("Start")
             self.textInfo.setText("System Paused")
