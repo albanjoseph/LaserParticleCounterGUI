@@ -164,7 +164,7 @@ class MatplotlibWidget(QMainWindow):
 
     def update_display1(self):
         self.MplWidget.canvas.axes.clear()
-        self.MplWidget.canvas.axes.bar(np.arange(len(self.partCounter)), self.partCounter)#, color = (0.5,0.1,0.5,0.6)
+        self.MplWidget.canvas.axes.bar(np.arange(len(self.partCounter)), self.partCounter)# color = (0.5,0.1,0.5,0.6)
         self.MplWidget.canvas.axes.set_xlabel('Particle Size')
         self.MplWidget.canvas.axes.set_ylabel('Number of Particles')
         self.MplWidget.canvas.axes.set_xticks(np.arange(len(self.partCounter)), ('Small', 'Medium', 'Large')) 
